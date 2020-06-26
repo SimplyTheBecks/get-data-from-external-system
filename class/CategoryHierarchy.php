@@ -3,33 +3,33 @@
 require_once(__DIR__ . '/GetProcessingSetData.php');
 require_once(__DIR__ . '/../utils.php');
 
-use HrapUtils\Utils as HrapUtils;
-
 /**
  * Class CategoryHierarchy - класс для получения, обработки, сохранения данных по иерархии категории
  */
 class CategoryHierarchy extends GetProcessingSetData
 {
-    // соответствие атрибутов
+    /**
+     * @var array Соответствие атрибутов
+     */
     protected $attributeMatching = [
-        // Code
-        'Code' => [
-            'attrName' => 'cls_incidence_code', // Код элемента в иерархии категории
+        // Код элемента в иерархии категории
+        'Code'      => [
+            'attrName' => 'cls_incidence_code',
             'dataType' => 'text'
         ],
-        // Name
-        'Name' => [
-            'attrName' => 'cls_incidence_name', // Наименование элемента в иерархии категории
+        // Наименование элемента в иерархии категории
+        'Name'      => [
+            'attrName' => 'cls_incidence_name',
             'dataType' => 'text'
         ],
-        // Archive
-        'Archive' => [
-            'attrName' => 'is_archived', // Удаленный
+        // Удаленный
+        'Archive'   => [
+            'attrName' => 'is_archived',
             'dataType' => 'boolean'
         ],
-        // Parent
+        // Идентификатор родителя
         'Parent[0]' => [
-            'attrName' => 'parent', // Идентификатор родителя
+            'attrName' => 'parent',
             'dataType' => 'text'
         ]
     ];
@@ -49,7 +49,7 @@ class CategoryHierarchy extends GetProcessingSetData
         if (empty($request)) return $res;
 
         // cURL запрос
-        $res = HrapUtils::curlRequest(URL_FOR_GET_DATA_FROM_HRAP, $request);
+        $res = Utils::curlRequest(URL_FOR_GET_DATA_FROM_EXTERNAL_SYS, $request);
 
         return $res;
     }
@@ -61,21 +61,18 @@ class CategoryHierarchy extends GetProcessingSetData
      */
     protected function createRequestForGetData(): array
     {
-        // запрос
-        $res = [
+        return [
             'DataModelRequest' => [
                 'StartElement' => 'Категория'
             ]
         ];
-
-        return $res;
     }
 
     /**
      * Сохранение данных
      *
-     * @param array $data - массив с данными
-     * @return integer
+     * @param array $data Данные
+     * @return int
      */
     public function setData(array $data): int
     {
@@ -87,18 +84,17 @@ class CategoryHierarchy extends GetProcessingSetData
         $parentData = $this->getParentData($data);
 
         foreach ($data as $i => $row) {
-
             $data[$i]['parent'] = [
-                'value' => 0,
+                'value'    => 0,
                 'dataType' => 'integer'
             ];
         }
 
         // обработка значений перед сохранением
-        $data = HrapUtils::dataProcessingBeforeSaving($data);
+        $data = Utils::dataProcessingBeforeSaving($data);
 
-        // получение массива атрибутов для таблицы, хранящей данные
-        $attrArray = $this->getAttrArrayForDataTable();
+        // получение атрибутов для таблицы, хранящей данные
+        $attrArray = $this->getAttrsForDataTable();
         $attrArray['insert_row'] = 'timestamp';
         ksort($attrArray);
         $attrArray = array_keys($attrArray);
@@ -107,10 +103,8 @@ class CategoryHierarchy extends GetProcessingSetData
         $insertValues = [];
 
         foreach ($data as $rowMsg) {
-
             $rowMsg['insert_row'] = "now() at time zone 'utc'";
             ksort($rowMsg);
-
             $insertValues[] = implode(",\n", array_values($rowMsg));
         }
 
@@ -118,19 +112,20 @@ class CategoryHierarchy extends GetProcessingSetData
         $updateValues = [];
 
         foreach ($attrArray as $attrName) {
-
             $updateValues[] = $attrName . " = EXCLUDED." . $attrName;
         }
 
-        $request = "INSERT INTO tiod.cls_incidence
-                        (" . implode(",\n", $attrArray) . ")
-                    VALUES
-                        (" . implode("),\n(", $insertValues) . ")
-                    ON CONFLICT ON CONSTRAINT cls_incidence_cls_incidence_code_key
-                    DO
-                        UPDATE
-                        SET " . implode(",\n", $updateValues) . "
-                    RETURNING id, parent, cls_incidence_code;";
+        $request = "
+            INSERT INTO external_sys.cls_incidence
+                (" . implode(",\n", $attrArray) . ")
+            VALUES
+                (" . implode("),\n(", $insertValues) . ")
+            ON CONFLICT ON CONSTRAINT cls_incidence_cls_incidence_code_key
+            DO
+                UPDATE
+                SET " . implode(",\n", $updateValues) . "
+            RETURNING id, parent, cls_incidence_code;
+        ";
 
         $result = pg_query($GLOBALS['db_connection'], $request);
 
@@ -139,7 +134,6 @@ class CategoryHierarchy extends GetProcessingSetData
         $dataForUpdate = [];
 
         while ($row = pg_fetch_assoc($result)) {
-
             $dataForUpdate[$row['cls_incidence_code']] = [
                 'id'     => $row['id'],
                 'parent' => $row['parent']
@@ -155,7 +149,7 @@ class CategoryHierarchy extends GetProcessingSetData
     /**
      * Получение данных поля parent (родитель)
      *
-     * @param array $data - массив с данными
+     * @param array $data Данные
      * @return array
      */
     private function getParentData(array $data): array
@@ -165,7 +159,6 @@ class CategoryHierarchy extends GetProcessingSetData
         if (empty($data)) return $res;
 
         foreach ($data as $iRow) {
-
             $res[$iRow['cls_incidence_code']['value']] = $iRow['parent']['value'];
         }
 
@@ -175,9 +168,9 @@ class CategoryHierarchy extends GetProcessingSetData
     /**
      * Обновление поля parent (родитель)
      *
-     * @param array $data - массив с данными
-     * @param array $parentData - массив с данными поля parent (родитель)
-     * @return integer
+     * @param array $data       Данные
+     * @param array $parentData Данные поля parent (родитель)
+     * @return int
      */
     private function updateParent(array $data, array $parentData): int
     {
@@ -186,11 +179,7 @@ class CategoryHierarchy extends GetProcessingSetData
         if (empty($data)) return $res;
 
         foreach ($data as $code => $row) {
-
-            if (
-                isset($parentData[$code])
-                && isset($data[$parentData[$code]])
-            ) {
+            if (isset($parentData[$code], $data[$parentData[$code]])) {
                 $data[$code]['parent'] = $data[$parentData[$code]]['id'];
             }
         }
@@ -198,10 +187,12 @@ class CategoryHierarchy extends GetProcessingSetData
         $request = "";
 
         foreach ($data as $row) {
-
-            $request .= "UPDATE tiod.cls_incidence
-                        SET parent = " . $row['parent'] . "
-                        WHERE id = " . $row['id'] . ";\n";
+            $request .= "
+                UPDATE external_sys.cls_incidence
+                SET parent = {$row['parent']}
+                WHERE
+                    id = {$row['id']};\n
+            ";
         }
 
         $result = pg_query($GLOBALS['db_connection'], $request);
