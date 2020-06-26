@@ -1,7 +1,5 @@
 <?php
 
-namespace HrapUtils;
-
 /**
  * Class Utils - класс для вспомогательного функционала
  */
@@ -10,8 +8,8 @@ class Utils
     /**
      * cURL запрос
      *
-     * @param string $url - url для отправки cURL запроса
-     * @param array $request - тело запроса
+     * @param string $url     URL для отправки cURL запроса
+     * @param array  $request Тело запроса
      * @return array
      */
     public static function curlRequest(string $url, array $request): array
@@ -23,7 +21,6 @@ class Utils
         $post = ['request' => json_encode($request)];
 
         if ($curl = curl_init($url)) {
-
             curl_setopt($curl, CURLOPT_POST, true);
             curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
             curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
@@ -43,7 +40,7 @@ class Utils
     /**
      * Обработка значений перед сохранением
      *
-     * @param array $data - массив с данными
+     * @param array $data Данные
      * @return array
      */
     public static function dataProcessingBeforeSaving(array $data): array
@@ -53,77 +50,60 @@ class Utils
         if (empty($data)) return $res;
 
         foreach ($data as $rowMsg) {
-
             $rowRes = [];
 
             foreach ($rowMsg as $attrName => $attrRow) {
-
                 $attrRow['value'] = trim($attrRow['value']);
 
                 switch ($attrRow['dataType']) {
-
                     // число
                     case 'integer':
                     case 'numeric':
-
                         if (
-                            is_null($attrRow['value'])
-                            || '' == $attrRow['value']
+                            $attrRow['value'] === ''
+                            || is_null($attrRow['value'])
                         ) {
                             $rowRes[$attrName] = "NULL";
                         } else {
                             $rowRes[$attrName] = $attrRow['value'];
                         }
-
                         break;
-
                     // текст
                     case 'text':
-
                         if (
-                            is_null($attrRow['value'])
-                            || '' == $attrRow['value']
+                            $attrRow['value'] === ''
+                            || is_null($attrRow['value'])
                         ) {
                             $rowRes[$attrName] = "''";
                         } else {
                             $rowRes[$attrName] = "'" . pg_escape_string($attrRow['value']) . "'";
                         }
-
                         break;
-
                     // дата и время
                     case 'timestamp':
-
                         if (
-                            is_null($attrRow['value'])
-                            || '' == $attrRow['value']
+                            $attrRow['value'] === ''
+                            || is_null($attrRow['value'])
                         ) {
                             $rowRes[$attrName] = "NULL";
                         } else {
                             $rowRes[$attrName] = "'" . $attrRow['value'] . "'";
                         }
-
                         break;
-
                     // true/false
                     case 'boolean':
-
-                        if ('true' == $attrRow['value']) {
-
+                        if ($attrRow['value'] === 'true') {
                             $rowRes[$attrName] = "TRUE";
-                        } else if ('false' == $attrRow['value']) {
-
+                        } elseif ($attrRow['value'] === 'false') {
                             $rowRes[$attrName] = "FALSE";
                         } else {
                             $rowRes[$attrName] = "NULL";
                         }
-
                         break;
                 }
             }
 
             if (!empty($rowRes)) {
-
                 $res[] = $rowRes;
             }
         }
